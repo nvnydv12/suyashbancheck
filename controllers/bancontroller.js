@@ -5,32 +5,21 @@ async function getBanInfo(req, res) {
   const uid = req.query.uid;
   const region = req.query.region || req.query.server || 'IND';
 
-  if (!uid || !/^\d+$/.test(uid.trim())) {
+  if (!uid || !/^\d+$/.test(String(uid).trim())) {
     return res.status(400).json({
       success: false,
-      error: "Valid numeric UID parameter is required. Example: /check?uid=1171436371"
+      error: 'Valid numeric UID parameter is required. Example: /check?uid=1171436371'
     });
   }
 
-  const cleanUid = uid.trim();
+  const cleanUid = String(uid).trim();
 
   try {
-    // 1. Fetch real ban status from Garena Anti-Hack API
-    const ban = await fetchBanStatus(cleanUid);
-
-    // If ID is not found on Garena Anti-Hack
-    if (ban.ban_status === 'ID NOT FOUND') {
-      return res.status(404).json({
-        success: false,
-        uid: cleanUid,
-        status: "NOT_FOUND",
-        error: "ID NOT FOUND - Player does not exist on Garena servers",
-        developer: "Bunnysh17"
-      });
-    }
-
-    // 2. Fetch Real Player Details (Exact Level, Likes, Nickname, Guild, Dates)
+    // 1. Fetch Real Player Details (Exact Level, Likes, Nickname, Guild, Dates, Credit Score)
     const player = await fetchPlayerData(cleanUid, region);
+
+    // 2. Fetch real ban & suspension status
+    const ban = await fetchBanStatus(cleanUid, player);
 
     res.json({
       success: true,
@@ -46,10 +35,14 @@ async function getBanInfo(req, res) {
       ban_type: ban.ban_type,
       ban_period: ban.ban_period,
       banned_when: ban.banned_when,
+      suspension_ending_in: ban.suspension_ending_in,
+      suspension_ends_at: ban.suspension_ends_at,
+      reason: ban.reason,
+      credit_score: player.credit_score,
       last_active_at: player.last_login_at,
       account_created_at: player.account_created_at,
       message: ban.message,
-      developer: "Bunnysh17"
+      developer: 'Bunnysh17'
     });
   } catch (err) {
     res.status(500).json({

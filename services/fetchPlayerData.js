@@ -21,18 +21,29 @@ function formatTimestamp(ts) {
   }
 }
 
-/**
- * Fetches real in-game player details (Nickname, Real Level, Likes, Guild, Dates)
- * 1. Checks local engine http://127.0.0.1:5000/check_ban if available
- * 2. Checks live cloud suyashprofileapi.vercel.app/profile
- */
+function parseDateToMs(ts) {
+  if (!ts || ts === '0' || ts === 'N/A') return null;
+  if (!isNaN(Number(ts))) {
+    const num = Number(ts);
+    return num > 1e11 ? num : num * 1000;
+  }
+  try {
+    const clean = String(ts).replace(/\s*\([A-Z]+\)\s*$/, '').replace(' at ', ' ');
+    const d = new Date(clean);
+    return isNaN(d.getTime()) ? null : d.getTime();
+  } catch (e) {
+    return null;
+  }
+}
+
 async function fetchPlayerData(uid, region = 'IND') {
   // Option 1: Local engine
   try {
-    const localRes = await axios.get(`http://127.0.0.1:5000/check_ban?uid=${encodeURIComponent(uid)}&server_name=${encodeURIComponent(region)}`, {
+    const localRes = await axios.get('http://127.0.0.1:5000/check_ban?uid=' + encodeURIComponent(uid) + '&server_name=' + encodeURIComponent(region), {
       timeout: 3000
     });
     if (localRes.data && localRes.data.nickname && localRes.data.status !== 'NOT_FOUND') {
+      const lastLoginStr = localRes.data.last_login_at || localRes.data.lastloginat;
       return {
         uid: String(uid),
         nickname: localRes.data.nickname,
@@ -41,7 +52,9 @@ async function fetchPlayerData(uid, region = 'IND') {
         exp: Number(localRes.data.exp) || 0,
         guild: localRes.data.guild || 'None',
         region: localRes.data.server || region.toUpperCase(),
-        last_login_at: formatTimestamp(localRes.data.last_login_at || localRes.data.lastloginat),
+        credit_score: Number(localRes.data.credit_score) || 100,
+        last_login_at: formatTimestamp(lastLoginStr),
+        last_login_ms: parseDateToMs(lastLoginStr),
         account_created_at: formatTimestamp(localRes.data.created_at || localRes.data.createat)
       };
     }
@@ -51,11 +64,13 @@ async function fetchPlayerData(uid, region = 'IND') {
 
   // Option 2: Live suyashprofileapi.vercel.app
   try {
-    const cloudRes = await axios.get(`https://suyashprofileapi.vercel.app/profile?server=${encodeURIComponent(region)}&uid=${encodeURIComponent(uid)}`, {
+    const cloudRes = await axios.get('https://suyashprofileapi.vercel.app/profile?server=' + encodeURIComponent(region) + '&uid=' + encodeURIComponent(uid), {
       timeout: 7000
     });
     const d = cloudRes.data;
     if (d && d.basicinfo && d.basicinfo.nickname) {
+      const lastLoginRaw = d.basicinfo.lastloginat;
+      const creditScore = d.creditscoreinfo ? (Number(d.creditscoreinfo.creditscore) || 100) : 100;
       return {
         uid: String(uid),
         nickname: d.basicinfo.nickname,
@@ -64,7 +79,9 @@ async function fetchPlayerData(uid, region = 'IND') {
         exp: Number(d.basicinfo.exp) || 0,
         guild: d.clanbasicinfo ? (d.clanbasicinfo.clanname || 'None') : 'None',
         region: d.basicinfo.region || region.toUpperCase(),
-        last_login_at: formatTimestamp(d.basicinfo.lastloginat),
+        credit_score: creditScore,
+        last_login_at: formatTimestamp(lastLoginRaw),
+        last_login_ms: parseDateToMs(lastLoginRaw),
         account_created_at: formatTimestamp(d.basicinfo.createat)
       };
     }
@@ -80,9 +97,11 @@ async function fetchPlayerData(uid, region = 'IND') {
     exp: 0,
     guild: 'None',
     region: region.toUpperCase(),
+    credit_score: 100,
     last_login_at: 'N/A',
+    last_login_ms: null,
     account_created_at: 'N/A'
   };
 }
 
-module.exports = { fetchPlayerData };
+module.exports = { fetchPlayerData, parseDateToMs, formatTimestamp };
