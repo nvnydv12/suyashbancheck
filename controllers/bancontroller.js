@@ -3,16 +3,59 @@ const { fetchBanStatus } = require('../services/fetchBanStatus');
 
 async function getBanInfo(req, res) {
   const uid = req.query.uid;
-  if (!uid) return res.status(400).json({ error: "UID parameter is required" });
+  const region = req.query.region || req.query.server || 'IND';
+
+  if (!uid || !/^\d+$/.test(uid.trim())) {
+    return res.status(400).json({
+      success: false,
+      error: "Valid numeric UID parameter is required. Example: /check?uid=1171436371"
+    });
+  }
+
+  const cleanUid = uid.trim();
 
   try {
-    const player = await fetchPlayerData(uid);
-    if (!player.nickname) return res.status(404).json({ error: "ID NOT FOUND" });
+    // 1. Fetch real ban status from Garena Anti-Hack API
+    const ban = await fetchBanStatus(cleanUid);
 
-    const ban = await fetchBanStatus(uid);
-    res.json({ ...player, ...ban });
+    // If ID is not found on Garena Anti-Hack
+    if (ban.ban_status === 'ID NOT FOUND') {
+      return res.status(404).json({
+        success: false,
+        uid: cleanUid,
+        status: "NOT_FOUND",
+        error: "ID NOT FOUND - Player does not exist on Garena servers",
+        developer: "Bunnysh17"
+      });
+    }
+
+    // 2. Fetch Real Player Details (Exact Level, Likes, Nickname, Guild, Dates)
+    const player = await fetchPlayerData(cleanUid, region);
+
+    res.json({
+      success: true,
+      uid: cleanUid,
+      nickname: player.nickname,
+      level: player.level,
+      likes: player.likes,
+      exp: player.exp,
+      guild: player.guild,
+      region: player.region,
+      is_banned: ban.is_banned,
+      ban_status: ban.ban_status,
+      ban_type: ban.ban_type,
+      ban_period: ban.ban_period,
+      banned_when: ban.banned_when,
+      last_active_at: player.last_login_at,
+      account_created_at: player.account_created_at,
+      message: ban.message,
+      developer: "Bunnysh17"
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
   }
 }
 

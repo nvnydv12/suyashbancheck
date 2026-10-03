@@ -3,10 +3,16 @@ const { getBanInfo } = require('../controllers/bancontroller');
 
 const router = express.Router();
 
-
 router.get('/check', getBanInfo);
-router.get('/', (req, res) =>{
-    res.send('Node JS API for Garena Free Fire Ban Status by bhuwanhex (Aimguard)');
-})
+router.get('/api/check', getBanInfo);
+router.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    api: 'suyashbancheck - Free Fire Ban Checker API',
+    usage: '/check?uid=<PLAYER_UID>',
+    example: '/check?uid=1171436371',
+    developer: 'Bunnysh17'
+  });
+});
 
 module.exports = router;
