@@ -1,10 +1,12 @@
 const axios = require('axios');
 
 function formatTimestamp(ts) {
-  if (!ts || ts === '0' || Number(ts) <= 0) return 'N/A';
+  if (!ts || ts === '0' || ts === 'N/A') return 'N/A';
+  if (typeof ts === 'string' && isNaN(Number(ts))) return ts;
   try {
-    const d = new Date(Number(ts) * 1000);
-    return d.toLocaleString('en-IN', {
+    const num = Number(ts);
+    const d = new Date(num > 1e11 ? num : num * 1000);
+    return isNaN(d.getTime()) ? String(ts) : d.toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
       day: '2-digit',
       month: 'short',
@@ -15,7 +17,7 @@ function formatTimestamp(ts) {
       hour12: true
     }) + ' (IST)';
   } catch (e) {
-    return 'N/A';
+    return String(ts);
   }
 }
 
